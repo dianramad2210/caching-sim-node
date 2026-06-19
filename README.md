@@ -2,7 +2,7 @@
 
 **Nama:** Dian Ramadhani  
 **Kelas:** RPL A  
-**NIM:** 105841116323
+**NIM:** 105841116323  
 **Mata Kuliah:** Scalable Systems Design
 
 Simulasi strategi caching untuk mata kuliah **Scalable Systems Design**.
