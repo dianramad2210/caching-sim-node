@@ -14,7 +14,7 @@ Mengimplementasikan cache-aside pattern dengan in-memory cache (simulasi Redis/M
 
 Laporan lengkap tersedia pada folder:
 
-docs/Laporan.pdf
+docs/TUGAS 3_DIAN RAMADHANI_105841116323_RPL A.pdf
 
 ## 🚀 Cara Menjalankan
 
