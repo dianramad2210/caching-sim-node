@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caching Strategy Simulator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+header{padding:16px 28px;border-bottom:1px solid #1e2535;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:16px;font-weight:600}
+header .badges{display:flex;gap:8px}
+.badge-sm{font-size:11px;padding:3px 10px;border-radius:20px;background:#1e2535;color:#64748b}
+.badge-sm.green{background:#14532d;color:#4ade80}
+.tabs{display:flex;padding:0 28px;border-bottom:1px solid #1e2535;background:#0b0e16;overflow-x:auto}
+.tab{padding:12px 18px;font-size:13px;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s}
+.tab:hover{color:#94a3b8}
+.tab.active{color:#60a5fa;border-bottom-color:#60a5fa}
+.panel{display:none;padding:22px 28px;max-width:1100px}
+.panel.active{display:block}
+/* cards */
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.card{background:#151b27;border:1px solid #1e2a3a;border-radius:10px;padding:13px 16px;flex:1;min-width:120px}
+.card label{font-size:11px;color:#64748b;display:block;margin-bottom:3px}
+.card .val{font-size:22px;font-weight:600}
+.card .sub{font-size:11px;color:#475569;margin-top:2px}
+.bar-wrap{background:#1e2535;border-radius:3px;height:5px;margin-top:6px;overflow:hidden}
+.bar{height:100%;border-radius:3px;transition:width .4s}
+/* controls */
+.ctrl{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.fld{display:flex;flex-direction:column;gap:4px}
+.fld label{font-size:11px;color:#64748b}
+select,input[type=text],input[type=number]{background:#151b27;border:1px solid #1e2a3a;color:#e2e8f0;border-radius:7px;padding:7px 10px;font-size:13px;outline:none;min-width:0}
+select:focus,input:focus{border-color:#3b82f6}
+button{background:#1d2d4a;border:1px solid #2d4a6a;color:#93c5fd;border-radius:7px;padding:8px 14px;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap}
+button:hover{background:#2d4a6a}
+button.red{background:#2d1a1a;border-color:#5a1f1f;color:#f87171}
+button.red:hover{background:#5a1f1f}
+button.green{background:#14532d;border-color:#166534;color:#4ade80}
+button.green:hover{background:#166534}
+/* slot grid */
+.section-label{font-size:12px;color:#64748b;margin-bottom:6px;margin-top:2px}
+.slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:6px;margin-bottom:14px}
+.slot{border:1px solid #1e2a3a;border-radius:8px;padding:9px 11px;min-height:54px;display:flex;flex-direction:column;justify-content:space-between;transition:background .3s,border-color .3s}
+.slot.empty{background:#0d1117}
+.slot.filled{background:#151b27}
+.slot.hit{background:#0d2a1a;border-color:#166534}
+.slot.evict{background:#2d1a00;border-color:#854d0e}
+.slot-key{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot-meta{font-size:10px;color:#475569}
+/* log */
+.log{background:#0b0e16;border:1px solid #1e2535;border-radius:8px;padding:10px;font-size:12px;font-family:'Consolas','Courier New',monospace;max-height:160px;overflow-y:auto}
+.le{padding:3px 0;border-bottom:1px solid #111827;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.le:last-child{border:none}
+.lt{color:#334155;min-width:58px;font-size:10px;flex-shrink:0}
+.lm{color:#94a3b8;word-break:break-all}
+.bx{display:inline-flex;font-size:10px;padding:1px 7px;border-radius:20px;font-weight:600;flex-shrink:0}
+.b-hit{background:#14532d;color:#4ade80}
+.b-miss{background:#450a0a;color:#f87171}
+.b-evict{background:#431407;color:#fb923c}
+.b-set{background:#2d1b4a;color:#c084fc}
+.b-del,.b-expired{background:#2d1a1a;color:#f87171}
+.b-flush,.b-config{background:#1e3a5f;color:#60a5fa}
+.b-store{background:#1e3a5f;color:#60a5fa}
+.b-tick{background:#1a2535;color:#94a3b8}
+.b-invalidate{background:#431407;color:#fb923c}
+.b-purge{background:#431407;color:#fb923c}
+.b-info{background:#1e3a5f;color:#60a5fa}
+/* source badge */
+.src-cache{color:#4ade80;font-weight:600;font-size:12px}
+.src-db{color:#f87171;font-weight:600;font-size:12px}
+/* CDN */
+.cdn-node{background:#151b27;border:1px solid #1e2a3a;border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.cdn-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.cdn-meta{font-size:11px;color:#64748b}
+.cdn-lat{font-size:14px;font-weight:600;color:#60a5fa}
+/* invalidation */
+.inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:6px;margin-bottom:12px}
+.inv-item{border:1px solid #1e2a3a;border-radius:8px;padding:9px 11px;font-size:12px;transition:all .3s}
+.inv-item.fresh{background:#151b27}
+.inv-item.stale{background:#2d1a00;border-color:#854d0e}
+.inv-key{font-size:11px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inv-meta{font-size:10px;color:#64748b}
+.tag-pill{display:inline-flex;font-size:10px;padding:1px 6px;border-radius:20px;background:#1e3a5f;color:#60a5fa;margin:1px}
+.sel-tag{background:#1d2d4a;border:1px solid #2d4a6a;color:#93c5fd;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer}
+.sel-tag.active{background:#1d4a7a;border-color:#3b82f6;color:#60a5fa;font-weight:600}
+/* compare */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.cmp-card{background:#151b27;border:1px solid #1e2a3a;border-radius:10px;padding:16px}
+.cmp-card h3{font-size:14px;font-weight:600;margin-bottom:12px;color:#93c5fd}
+.cmp-row{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid #1a1f2e;gap:8px}
+.cmp-row:last-child{border:none}
+.cmp-k{color:#64748b;flex-shrink:0}
+.cmp-v{font-weight:500;text-align:right}
+.good{color:#4ade80}.bad{color:#f87171}.ok{color:#fb923c}
+/* db result */
+.db-result{background:#0b0e16;border:1px solid #1e2535;border-radius:8px;padding:12px;font-size:12px;margin-bottom:12px;font-family:'Consolas','Courier New',monospace;min-height:52px;white-space:pre-wrap;word-break:break-all;color:#94a3b8}
+.latency-tag{font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600;display:inline-flex;margin-left:6px}
+.lat-fast{background:#14532d;color:#4ade80}
+.lat-slow{background:#450a0a;color:#f87171}
+@media(max-width:600px){.cmp-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Caching Strategy Simulator</h1>
+  <div class="badges">
+    <span class="badge-sm green" id="srv-status">● connected</span>
+    <span class="badge-sm">localhost:3000</span>
+    <span class="badge-sm">SQLite + Node.js</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('cache')">Cache Engine</div>
+  <div class="tab" onclick="showTab('db')">DB Queries</div>
+  <div class="tab" onclick="showTab('cdn')">CDN Simulator</div>
+  <div class="tab" onclick="showTab('inv')">Invalidation</div>
+  <div class="tab" onclick="showTab('compare')">Redis vs Memcached</div>
+</div>
+
+<!-- ══════════════════════ PANEL: CACHE ENGINE ══════════════════════ -->
+<div class="panel active" id="panel-cache">
+
+  <div class="ctrl">
+    <div class="fld">
+      <label>Eviction policy</label>
+      <select id="policy">
+        <option value="lru">LRU — Least Recently Used</option>
+        <option value="lfu">LFU — Least Frequently Used</option>
+        <option value="fifo">FIFO — First In First Out</option>
+        <option value="ttl">TTL — Time to Live</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>Max size</label>
+      <select id="csize">
+        <option value="4">4 slots</option>
+        <option value="6">6 slots</option>
+        <option value="8" selected>8 slots</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>TTL (ms)</label>
+      <input type="number" id="ttl-ms" value="15000" style="width:90px">
+    </div>
+    <button onclick="applyConfig()">Apply</button>
+    <button class="red" onclick="flushCache()">Flush cache</button>
+  </div>
+
+  <div class="ctrl">
+    <div class="fld">
+      <label>Manual key</label>
+      <input type="text" id="manual-key" placeholder="e.g. product:3" style="width:140px"
+        onkeydown="if(event.key==='Enter')manualGet()">
+    </div>
+    <button onclick="manualGet()">GET</button>
+    <button onclick="manualDel()">DEL</button>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <label>Hit rate</label>
+      <div class="val" id="c-hr" style="color:#4ade80">0%</div>
+      <div class="bar-wrap"><div class="bar" id="c-bar" style="width:0;background:#16a34a"></div></div>
+    </div>
+    <div class="card"><label>Total requests</label><div class="val" id="c-total">0</div></div>
+    <div class="card"><label>Hits</label><div class="val" id="c-hits" style="color:#4ade80">0</div></div>
+    <div class="card"><label>Misses</label><div class="val" id="c-misses" style="color:#f87171">0</div></div>
+    <div class="card"><label>Evictions</label><div class="val" id="c-evict" style="color:#fb923c">0</div></div>
+    <div class="card"><label>Used slots</label><div class="val" id="c-used">0 / 8</div></div>
+  </div>
+
+  <div class="section-label">Cache slots</div>
+  <div class="slot-grid" id="slot-grid"></div>
+
+  <div class="section-label">Cache log</div>
+  <div class="log" id="cache-log"></div>
+</div>
+
+<!-- ══════════════════════ PANEL: DB QUERIES ══════════════════════ -->
+<div class="panel" id="panel-db">
+
+  <div class="ctrl">
+    <div class="fld">
+      <label>Tipe data</label>
+      <select id="db-type">
+        <option value="product">Product</option>
+        <option value="user">User</option>
+        <option value="order">Order</option>
+        <option value="products-all">All Products</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>ID</label>
+      <input type="number" id="db-id" value="1" min="1" max="10" style="width:70px">
+    </div>
+    <button onclick="dbQuery()">Query</button>
+    <button onclick="dbQueryAll()">Load all products</button>
+  </div>
+
+  <div class="ctrl">
+    <div class="fld">
+      <label>Update stock (product ID)</label>
+      <input type="number" id="upd-id" value="1" min="1" max="10" style="width:70px">
+    </div>
+    <div class="fld">
+      <label>Stock baru</label>
+      <input type="number" id="upd-stock" value="50" style="width:70px">
+    </div>
+    <div class="fld">
+      <label>Write strategy</label>
+      <select id="write-strat">
+        <option value="write-through">Write-through</option>
+        <option value="write-back">Write-back</option>
+        <option value="write-around">Write-around</option>
+      </select>
+    </div>
+    <button class="green" onclick="updateStock()">Update stock</button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+    <div class="section-label" style="margin:0">Hasil query</div>
+    <span id="q-source"></span>
+    <span id="q-latency"></span>
+  </div>
+  <div class="db-result" id="db-result">Belum ada query. Pilih tipe data dan klik Query.</div>
+
+  <div class="row" style="margin-top:14px">
+    <div class="card"><label>Total queries</label><div class="val" id="dbl-total">0</div></div>
+    <div class="card"><label>Dari cache</label><div class="val" id="dbl-cache" style="color:#4ade80">0</div></div>
+    <div class="card"><label>Dari DB</label><div class="val" id="dbl-db" style="color:#f87171">0</div></div>
+    <div class="card">
+      <label>DB hit rate</label>
+      <div class="val" id="dbl-hr" style="color:#4ade80">0%</div>
+      <div class="bar-wrap"><div class="bar" id="dbl-bar" style="width:0;background:#16a34a"></div></div>
+    </div>
+    <div class="card"><label>Avg latency</label><div class="val" id="dbl-lat">0ms</div></div>
+  </div>
+
+  <div class="section-label">Query log (dari SQLite)</div>
+  <div class="log" id="db-log"></div>
+</div>
+
+<!-- ══════════════════════ PANEL: CDN ══════════════════════ -->
+<div class="panel" id="panel-cdn">
+
+  <div class="ctrl">
+    <div class="fld">
+      <label>Resource</label>
+      <select id="cdn-res">
+        <option>img/logo.png</option>
+        <option>js/app.bundle.js</option>
+        <option>api/user/profile</option>
+        <option>css/style.css</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>User region</label>
+      <select id="cdn-region">
+        <option>Jakarta</option>
+        <option>Singapore</option>
+        <option>New York</option>
+        <option>Frankfurt</option>
+      </select>
+    </div>
+    <button onclick="cdnReq()">Request</button>
+    <button class="red" onclick="cdnPurge()">Purge resource</button>
+  </div>
+
+  <div class="row">
+    <div class="card"><label>CDN hit rate</label><div class="val" id="cdn-hr" style="color:#4ade80">0%</div></div>
+    <div class="card"><label>Origin fetches</label><div class="val" id="cdn-of" style="color:#f87171">0</div></div>
+  </div>
+
+  <div class="section-label">Edge nodes</div>
+  <div id="cdn-nodes"></div>
+
+  <div class="section-label">CDN log</div>
+  <div class="log" id="cdn-log"></div>
+</div>
+
+<!-- ══════════════════════ PANEL: INVALIDATION ══════════════════════ -->
+<div class="panel" id="panel-inv">
+
+  <div class="ctrl">
+    <button onclick="invAdd()">+ Add item</button>
+    <button onclick="invTick()">Tick +5s</button>
+    <button class="red" onclick="invReset()">Reset</button>
+  </div>
+
+  <div class="ctrl">
+    <div class="fld">
+      <label>Strategy</label>
+      <select id="inv-strat">
+        <option value="ttl">TTL sweep</option>
+        <option value="tag">Tag-based</option>
+        <option value="key">Key-based</option>
+        <option value="write">Write-through refresh</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>Tag (untuk tag strategy)</label>
+      <div style="display:flex;gap:6px" id="tag-btns">
+        <button class="sel-tag" data-tag="user"    onclick="selTag(this)">user</button>
+        <button class="sel-tag" data-tag="product" onclick="selTag(this)">product</button>
+        <button class="sel-tag" data-tag="session" onclick="selTag(this)">session</button>
+        <button class="sel-tag" data-tag="order"   onclick="selTag(this)">order</button>
+      </div>
+    </div>
+    <div style="padding-top:18px">
+      <button onclick="invDo()">Invalidate ↗</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card"><label>Sim time</label><div class="val" id="inv-t">t+0s</div></div>
+    <div class="card"><label>Cached items</label><div class="val" id="inv-n">0</div></div>
+    <div class="card"><label>Stale</label><div class="val" id="inv-s" style="color:#fb923c">0</div></div>
+    <div class="card"><label>Invalidations</label><div class="val" id="inv-ops">0</div></div>
+  </div>
+
+  <div class="section-label">Cache items</div>
+  <div class="inv-grid" id="inv-grid"></div>
+
+  <div class="section-label">Invalidation log</div>
+  <div class="log" id="inv-log"></div>
+</div>
+
+<!-- ══════════════════════ PANEL: COMPARE ══════════════════════ -->
+<div class="panel" id="panel-compare">
+  <div class="cmp-grid">
+    <div class="cmp-card">
+      <h3>Redis</h3>
+      <div class="cmp-row"><span class="cmp-k">Data structures</span><span class="cmp-v good">String, List, Set, Hash, ZSet, Stream</span></div>
+      <div class="cmp-row"><span class="cmp-k">Persistence</span><span class="cmp-v good">RDB + AOF</span></div>
+      <div class="cmp-row"><span class="cmp-k">Replication</span><span class="cmp-v good">Master-Replica + Sentinel</span></div>
+      <div class="cmp-row"><span class="cmp-k">Cluster</span><span class="cmp-v good">Redis Cluster (built-in)</span></div>
+      <div class="cmp-row"><span class="cmp-k">Pub/Sub</span><span class="cmp-v good">Built-in</span></div>
+      <div class="cmp-row"><span class="cmp-k">Scripting</span><span class="cmp-v good">Lua scripts</span></div>
+      <div class="cmp-row"><span class="cmp-k">TTL per key</span><span class="cmp-v good">Yes</span></div>
+      <div class="cmp-row"><span class="cmp-k">Eviction policies</span><span class="cmp-v ok">LRU, LFU, allkeys, volatile</span></div>
+      <div class="cmp-row"><span class="cmp-k">Threading</span><span class="cmp-v ok">Single-threaded core</span></div>
+      <div class="cmp-row"><span class="cmp-k">Use cases</span><span class="cmp-v good">Sessions, queues, leaderboards, cache</span></div>
+      <div class="cmp-row"><span class="cmp-k">Throughput</span><span class="cmp-v ok">~100K ops/sec</span></div>
+    </div>
+    <div class="cmp-card">
+      <h3>Memcached</h3>
+      <div class="cmp-row"><span class="cmp-k">Data structures</span><span class="cmp-v bad">String (blob) only</span></div>
+      <div class="cmp-row"><span class="cmp-k">Persistence</span><span class="cmp-v bad">None — RAM only</span></div>
+      <div class="cmp-row"><span class="cmp-k">Replication</span><span class="cmp-v bad">Not built-in</span></div>
+      <div class="cmp-row"><span class="cmp-k">Cluster</span><span class="cmp-v ok">Client-side sharding</span></div>
+      <div class="cmp-row"><span class="cmp-k">Pub/Sub</span><span class="cmp-v bad">Not supported</span></div>
+      <div class="cmp-row"><span class="cmp-k">Scripting</span><span class="cmp-v bad">Not supported</span></div>
+      <div class="cmp-row"><span class="cmp-k">TTL per key</span><span class="cmp-v good">Yes</span></div>
+      <div class="cmp-row"><span class="cmp-k">Eviction policies</span><span class="cmp-v bad">LRU only</span></div>
+      <div class="cmp-row"><span class="cmp-k">Threading</span><span class="cmp-v good">Multi-threaded (faster)</span></div>
+      <div class="cmp-row"><span class="cmp-k">Use cases</span><span class="cmp-v ok">Simple object cache, HTML fragments</span></div>
+      <div class="cmp-row"><span class="cmp-k">Throughput</span><span class="cmp-v good">~200K+ ops/sec</span></div>
+    </div>
+  </div>
+
+  <div class="section-label">Eviction policy guide</div>
+  <div style="background:#151b27;border:1px solid #1e2a3a;border-radius:10px;padding:16px;font-size:12px;line-height:2;color:#94a3b8">
+    <strong style="color:#e2e8f0">Pilih policy berdasarkan pola akses:</strong><br>
+    • <strong style="color:#60a5fa">LRU</strong> — data yang baru diakses kemungkinan besar diakses lagi. Default terbaik untuk kebanyakan kasus.<br>
+    • <strong style="color:#60a5fa">LFU</strong> — data populer harus tetap di cache meski belum diakses baru-baru ini (e.g. trending content).<br>
+    • <strong style="color:#60a5fa">FIFO</strong> — sederhana, cocok untuk batch processing sequential.<br>
+    • <strong style="color:#60a5fa">TTL</strong> — data punya masa berlaku alami: session, token, API response.<br><br>
+    <strong style="color:#e2e8f0">Redis maxmemory-policy options:</strong><br>
+    <code style="color:#fb923c">noeviction</code> ·
+    <code style="color:#fb923c">allkeys-lru</code> ·
+    <code style="color:#fb923c">volatile-lru</code> ·
+    <code style="color:#fb923c">allkeys-lfu</code> ·
+    <code style="color:#fb923c">volatile-ttl</code> ·
+    <code style="color:#fb923c">allkeys-random</code>
+  </div>
+</div>
+
+<!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
+<script>
+const API = 'http://localhost:3000';
+let selectedTag = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function api(path, method = 'GET', body = null) {
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    return await r.json();
+  } catch (e) {
+    document.getElementById('srv-status').textContent = '● disconnected';
+    document.getElementById('srv-status').classList.remove('green');
+    return null;
+  }
+}
+
+function showTab(t) {
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+  const tabs = ['cache','db','cdn','inv','compare'];
+  document.querySelectorAll('.tab')[tabs.indexOf(t)].classList.add('active');
+  document.getElementById('panel-' + t).classList.add('active');
+  if (t === 'cache') refreshCacheStats();
+  if (t === 'db')    refreshDBLog();
+  if (t === 'cdn')   refreshCDN();
+}
+
+function renderLog(id, logs, kindMap) {
+  const el = document.getElementById(id);
+  if (!logs || !logs.length) {
+    el.innerHTML = '<div class="le"><span style="color:#334155">Belum ada aktivitas.</span></div>';
+    return;
+  }
+  el.innerHTML = logs.map(e => {
+    const cls = (kindMap || {})[e.kind] || 'b-info';
+    return `<div class="le">
+      <span class="lt">${e.time || e.ts || '—'}</span>
+      <span class="bx ${cls}">${(e.kind || e.source || '').toUpperCase()}</span>
+      <span class="lm">${e.msg || e.key || ''}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── CACHE ENGINE ─────────────────────────────────────────────────────────────
+async function refreshCacheStats() {
+  const s = await api('/api/cache/stats');
+  if (!s) return;
+  const total = s.hits + s.misses;
+  document.getElementById('c-hr').textContent    = s.hitRate + '%';
+  document.getElementById('c-bar').style.width   = s.hitRate + '%';
+  document.getElementById('c-total').textContent = total;
+  document.getElementById('c-hits').textContent  = s.hits;
+  document.getElementById('c-misses').textContent = s.misses;
+  document.getElementById('c-evict').textContent = s.evictions;
+  document.getElementById('c-used').textContent  = s.used + ' / ' + s.maxSize;
+  renderSlots(s.slots, s.maxSize, s.policy);
+  renderLog('cache-log', s.log, {
+    hit:'b-hit', miss:'b-miss', evict:'b-evict', set:'b-set',
+    del:'b-del', flush:'b-flush', config:'b-config', expired:'b-del'
+  });
+}
+
+function renderSlots(slots, max, policy) {
+  const g = document.getElementById('slot-grid');
+  g.innerHTML = '';
+  for (let i = 0; i < max; i++) {
+    const sl = slots[i];
+    const d  = document.createElement('div');
+    if (sl) {
+      d.className = 'slot filled';
+      let meta = '';
+      if (policy === 'lru')  meta = 'pos:' + (i+1);
+      if (policy === 'lfu')  meta = 'freq:' + sl.freq;
+      if (policy === 'fifo') meta = 'ins:' + (i+1);
+      if (policy === 'ttl')  meta = 'ttl:' + sl.ttlLeft + 's';
+      d.innerHTML = `<div class="slot-key">${sl.key}</div><div class="slot-meta">${meta}</div>`;
+    } else {
+      d.className = 'slot empty';
+      d.innerHTML = '<div class="slot-meta" style="color:#1e2a3a;font-style:italic">empty</div>';
+    }
+    g.appendChild(d);
+  }
+}
+
+async function applyConfig() {
+  await api('/api/cache/config', 'POST', {
+    policy:  document.getElementById('policy').value,
+    maxSize: document.getElementById('csize').value,
+    ttlMs:   document.getElementById('ttl-ms').value,
+  });
+  refreshCacheStats();
+}
+
+async function flushCache() {
+  await api('/api/cache/flush', 'POST');
+  refreshCacheStats();
+}
+
+async function manualGet() {
+  const key = document.getElementById('manual-key').value.trim();
+  if (!key) return;
+  await api('/api/cache/stats'); // just refresh
+  document.getElementById('manual-key').value = '';
+  refreshCacheStats();
+}
+
+async function manualDel() {
+  const key = document.getElementById('manual-key').value.trim();
+  if (!key) return alert('Masukkan key dulu');
+  await api('/api/cache/' + encodeURIComponent(key), 'DELETE');
+  document.getElementById('manual-key').value = '';
+  refreshCacheStats();
+}
+
+// ─── DB QUERIES ───────────────────────────────────────────────────────────────
+async function dbQuery() {
+  const type = document.getElementById('db-type').value;
+  const id   = document.getElementById('db-id').value;
+  let result;
+  if (type === 'products-all') {
+    result = await api('/api/products');
+  } else if (type === 'product') {
+    result = await api('/api/products/' + id);
+  } else if (type === 'user') {
+    result = await api('/api/users/' + id);
+  } else if (type === 'order') {
+    result = await api('/api/orders/' + id);
+  }
+  if (!result) return;
+  showQueryResult(result);
+  refreshCacheStats();
+  refreshDBLog();
+}
+
+async function dbQueryAll() {
+  const result = await api('/api/products');
+  if (!result) return;
+  showQueryResult(result);
+  refreshCacheStats();
+  refreshDBLog();
+}
+
+function showQueryResult(result) {
+  document.getElementById('db-result').textContent = JSON.stringify(result.data, null, 2);
+  const srcEl = document.getElementById('q-source');
+  const latEl = document.getElementById('q-latency');
+  srcEl.innerHTML = `<span class="src-${result.source}">${result.source === 'cache' ? '⚡ CACHE' : '🗄 DB'}</span>`;
+  const latMs = result.latency_ms;
+  latEl.innerHTML = `<span class="latency-tag ${latMs < 10 ? 'lat-fast' : 'lat-slow'}">${latMs}ms</span>`;
+}
+
+async function updateStock() {
+  const id       = document.getElementById('upd-id').value;
+  const stock    = document.getElementById('upd-stock').value;
+  const strategy = document.getElementById('write-strat').value;
+  const result   = await api('/api/products/' + id + '/stock', 'PUT', { stock: parseInt(stock), strategy });
+  if (!result) return;
+  showQueryResult(result);
+  refreshCacheStats();
+  refreshDBLog();
+}
+
+async function refreshDBLog() {
+  const d = await api('/api/db/log');
+  if (!d) return;
+  const s = d.stats;
+  document.getElementById('dbl-total').textContent = s.total;
+  document.getElementById('dbl-cache').textContent = s.fromCache;
+  document.getElementById('dbl-db').textContent    = s.fromDB;
+  document.getElementById('dbl-hr').textContent    = s.hitRate + '%';
+  document.getElementById('dbl-bar').style.width   = s.hitRate + '%';
+  document.getElementById('dbl-lat').textContent   = s.avgLatency + 'ms';
+  const el = document.getElementById('db-log');
+  el.innerHTML = (d.log || []).map(e => `
+    <div class="le">
+      <span class="lt">${e.ts.split(' ')[1] || e.ts}</span>
+      <span class="bx ${e.source === 'cache' ? 'b-hit' : 'b-miss'}">${e.source.toUpperCase()}</span>
+      <span class="lm">${e.query_type} ${e.key} — ${e.latency_ms}ms</span>
+    </div>`).join('') || '<div class="le"><span style="color:#334155">Belum ada query.</span></div>';
+}
+
+// ─── CDN ──────────────────────────────────────────────────────────────────────
+async function refreshCDN() {
+  const s = await api('/api/cdn/status');
+  if (!s) return;
+  document.getElementById('cdn-hr').textContent = s.hitRate + '%';
+  document.getElementById('cdn-of').textContent = s.originFetches;
+  const el = document.getElementById('cdn-nodes');
+  el.innerHTML = '';
+  for (const [region, info] of Object.entries(s.edges)) {
+    const d = document.createElement('div');
+    d.className = 'cdn-node';
+    d.innerHTML = `
+      <div>
+        <div class="cdn-name">${region}</div>
+        <div class="cdn-meta">${info.total} cached ·
+          <span style="color:#4ade80">${info.fresh} fresh</span> ·
+          <span style="color:#fb923c">${info.stale} stale</span>
+        </div>
+      </div>
+      <div class="cdn-lat">${info.baseMs}–${info.baseMs+5}ms <span style="font-size:11px;color:#64748b">edge</span></div>`;
+    el.appendChild(d);
+  }
+  renderLog('cdn-log', s.log, { HIT:'b-hit', MISS:'b-miss', PURGE:'b-purge' });
+}
+
+async function cdnReq() {
+  await api('/api/cdn/request', 'POST', {
+    resource: document.getElementById('cdn-res').value,
+    region:   document.getElementById('cdn-region').value,
+  });
+  refreshCDN();
+}
+
+async function cdnPurge() {
+  await api('/api/cdn/purge', 'POST', { resource: document.getElementById('cdn-res').value });
+  refreshCDN();
+}
+
+// ─── INVALIDATION ─────────────────────────────────────────────────────────────
+function renderInv(s) {
+  if (!s) return;
+  document.getElementById('inv-t').textContent   = 't+' + s.simTime + 's';
+  document.getElementById('inv-n').textContent   = s.total;
+  document.getElementById('inv-s').textContent   = s.stale;
+  document.getElementById('inv-ops').textContent = s.ops;
+  const g = document.getElementById('inv-grid');
+  if (!s.items.length) {
+    g.innerHTML = '<div style="font-size:12px;color:#334155;padding:8px">Belum ada item. Klik "+ Add item".</div>';
+  } else {
+    g.innerHTML = s.items.map(item => `
+      <div class="inv-item ${item.fresh ? 'fresh' : 'stale'}">
+        <div class="inv-key">${item.key}</div>
+        <div class="inv-meta">${item.fresh ? 'fresh' : 'stale'} · age:${item.age}s/${item.ttl}s</div>
+        <div style="margin-top:4px">${(item.tags||[]).map(t => `<span class="tag-pill">${t}</span>`).join('')}</div>
+      </div>`).join('');
+  }
+  renderLog('inv-log', s.log, { store:'b-store', tick:'b-tick', invalidate:'b-invalidate' });
+}
+
+async function invAdd()   { renderInv(await api('/api/inv/add',  'POST', {})); }
+async function invTick()  { renderInv(await api('/api/inv/tick', 'POST', {})); }
+async function invReset() { renderInv(await api('/api/inv/reset','POST', {})); }
+async function invDo() {
+  const strategy = document.getElementById('inv-strat').value;
+  const keys     = [...document.querySelectorAll('.inv-item .inv-key')].map(e => e.textContent);
+  renderInv(await api('/api/inv/invalidate', 'POST', {
+    strategy, tag: selectedTag, key: keys[0] || null,
+  }));
+}
+
+function selTag(btn) {
+  document.querySelectorAll('.sel-tag').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedTag = btn.dataset.tag;
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+refreshCacheStats();
+invReset().then(renderInv);
+</script>
+</body>
+</html>

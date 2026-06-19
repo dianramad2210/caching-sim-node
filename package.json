@@ -1,0 +1,14 @@
+{
+  "name": "caching-strategy-simulator",
+  "version": "1.0.0",
+  "description": "Simulasi Strategi Caching - Scalable Systems Design",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}

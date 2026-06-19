@@ -1,0 +1,254 @@
+================================================================
+   DOKUMENTASI PENGUJIAN SIMULASI STRATEGI CACHING
+   Mata Kuliah  : Scalable Systems Design
+   Teknologi    : Node.js + Express + SQLite
+   Simulator    : http://localhost:3000
+================================================================
+
+----------------------------------------------------------------
+A. INFORMASI PROYEK
+----------------------------------------------------------------
+Nama Proyek   : Caching Strategy Simulator
+Deskripsi     : Simulasi strategi caching menggunakan in-memory
+                cache (mensimulasikan Redis/Memcached) di depan
+                database SQLite. Mengimplementasikan cache-aside
+                pattern dengan berbagai eviction policy dan
+                invalidation strategy.
+
+Stack Teknologi:
+  - Backend    : Node.js + Express.js
+  - Database   : SQLite (via better-sqlite3)
+  - Cache      : In-memory (CacheEngine custom)
+  - Frontend   : HTML + CSS + Vanilla JS
+  - Port       : 3000
+
+----------------------------------------------------------------
+B. FITUR YANG DIUJI
+----------------------------------------------------------------
+1. Cache Engine     — LRU, LFU, FIFO, TTL eviction policy
+2. Cache-Aside      — GET product/user/order dari DB + cache
+3. Write Strategies — Write-through, Write-back, Write-around
+4. CDN Simulator    — Edge cache 4 region, purge mechanism
+5. Invalidation     — TTL sweep, Tag-based, Key-based, Write-through refresh
+
+----------------------------------------------------------------
+C. SKENARIO PENGUJIAN
+----------------------------------------------------------------
+
+════════════════════════════════════════════════════════════════
+SKENARIO 1 — CACHE MISS DAN CACHE HIT (Cache-Aside Pattern)
+════════════════════════════════════════════════════════════════
+
+Tujuan:
+  Membuktikan bahwa request pertama (MISS) membutuhkan waktu
+  lebih lama karena query ke DB, sedangkan request berikutnya
+  (HIT) jauh lebih cepat karena diambil dari cache.
+
+Langkah Pengujian:
+  1. Buka tab "DB Queries"
+  2. Pilih tipe data = Product, ID = 1
+  3. Klik tombol [Query]
+  4. Catat: Source dan Latency pada hasil pertama
+  5. Klik tombol [Query] sekali lagi (tanpa flush cache)
+  6. Catat: Source dan Latency pada hasil kedua
+
+Hasil yang Diharapkan:
+  Request 1 : Source = DB   | Latency = 50–150ms (simulasi I/O)
+  Request 2 : Source = CACHE | Latency = 0–5ms
+
+Catatan Hasil Pengujian:
+  Request 1 : Source = ________ | Latency = ________
+  Request 2 : Source = ________ | Latency = ________
+  Kesimpulan: __________________________________________________
+
+════════════════════════════════════════════════════════════════
+SKENARIO 2 — PERBANDINGAN EVICTION POLICY
+════════════════════════════════════════════════════════════════
+
+Tujuan:
+  Membandingkan hit rate antara LRU, LFU, FIFO, dan TTL
+  menggunakan pola akses yang sama.
+
+Pola akses yang digunakan (urutan query):
+  product:1 → product:2 → product:3 → product:1 →
+  product:4 → product:1 → product:2 → product:5 →
+  product:1 → product:3
+
+Langkah Pengujian:
+  1. Buka tab "Cache Engine"
+  2. Set Max Size = 4 slots, lalu klik [Apply]
+  3. Ubah policy ke LRU, klik [Apply]
+  4. Jalankan urutan query di atas via tab "DB Queries"
+  5. Catat Hit Rate dan Evictions di tab "Cache Engine"
+  6. Klik [Flush cache], ganti policy ke LFU, ulangi langkah 4-5
+  7. Ulangi untuk FIFO dan TTL
+
+Hasil Pengujian:
+
+  Policy | Hit Rate | Evictions | Catatan
+  -------|----------|-----------|--------
+  LRU    | ________ | _________ | ________________________
+  LFU    | ________ | _________ | ________________________
+  FIFO   | ________ | _________ | ________________________
+  TTL    | ________ | _________ | ________________________
+
+Analisis:
+  Policy terbaik untuk pola akses ini: __________________
+  Alasan: ________________________________________________
+
+════════════════════════════════════════════════════════════════
+SKENARIO 3 — WRITE STRATEGY (Write-through vs Write-back vs Write-around)
+════════════════════════════════════════════════════════════════
+
+Tujuan:
+  Membuktikan perbedaan perilaku cache dan konsistensi data
+  antara ketiga write strategy saat terjadi update.
+
+Langkah Pengujian:
+
+  [Write-through]
+  1. Buka tab "DB Queries"
+  2. Pilih Write strategy = Write-through
+  3. Update stock product ID 1 → stock = 99
+  4. Langsung query product:1 (tab DB Queries, Query)
+  5. Catat: apakah cache langsung menampilkan stock = 99?
+  Hasil: Cache updated? [ ] Ya  [ ] Tidak
+  Latency update: ________
+
+  [Write-back]
+  1. Ubah Write strategy = Write-back
+  2. Update stock product ID 2 → stock = 77
+  3. Langsung query product:2
+  4. Catat: cache menampilkan 77, tapi DB diupdate async
+  Hasil: Cache updated? [ ] Ya  [ ] Tidak
+  Latency update: ________
+
+  [Write-around]
+  1. Ubah Write strategy = Write-around
+  2. Update stock product ID 3 → stock = 55
+  3. Langsung query product:3
+  4. Catat: cache MISS karena cache tidak diupdate
+  Hasil: Terjadi MISS? [ ] Ya  [ ] Tidak
+  Latency update: ________
+
+  Perbandingan:
+  Strategy       | Latency | Cache Consistency | DB Consistency
+  ---------------|---------|-------------------|---------------
+  Write-through  | _______ | _____________     | _____________
+  Write-back     | _______ | _____________     | _____________
+  Write-around   | _______ | _____________     | _____________
+
+════════════════════════════════════════════════════════════════
+SKENARIO 4 — CDN EDGE CACHE
+════════════════════════════════════════════════════════════════
+
+Tujuan:
+  Membuktikan perbedaan latency antara origin fetch (MISS)
+  dan edge cache hit (HIT) berdasarkan region dan resource type.
+
+Langkah Pengujian:
+  1. Buka tab "CDN Simulator"
+  2. Pilih resource = img/logo.png, region = Jakarta
+  3. Klik [Request] — catat latency (MISS, origin fetch)
+  4. Klik [Request] lagi — catat latency (HIT, edge cache)
+  5. Klik [Purge resource] lalu [Request] — catat latency
+  6. Ulangi dengan region = New York
+
+Hasil Pengujian:
+
+  Resource        | Region    | Request | Status | Latency
+  ----------------|-----------|---------|--------|--------
+  img/logo.png    | Jakarta   | 1 (MISS)| ______ | ______
+  img/logo.png    | Jakarta   | 2 (HIT) | ______ | ______
+  img/logo.png    | Jakarta   | setelah purge | __ | ____
+  api/user/profile| Jakarta   | 1 (MISS)| ______ | ______
+  api/user/profile| Jakarta   | 2 (HIT) | ______ | ______
+  img/logo.png    | New York  | 1 (MISS)| ______ | ______
+  img/logo.png    | New York  | 2 (HIT) | ______ | ______
+
+Analisis TTL per resource:
+  img/logo.png       TTL = 86400s (1 hari)   — jarang berubah
+  js/app.bundle.js   TTL = 3600s  (1 jam)    — deploy berkala
+  api/user/profile   TTL = 30s               — data dinamis
+  css/style.css      TTL = 7200s  (2 jam)    — semi-statis
+
+════════════════════════════════════════════════════════════════
+SKENARIO 5 — CACHE INVALIDATION STRATEGY
+════════════════════════════════════════════════════════════════
+
+Tujuan:
+  Membandingkan efektivitas berbagai invalidation strategy
+  dalam membersihkan cache yang stale.
+
+Langkah Pengujian:
+
+  [TTL Sweep]
+  1. Buka tab "Invalidation"
+  2. Klik [+ Add item] sebanyak 6 kali
+  3. Klik [Tick +5s] sebanyak 3 kali (sim time = t+15s)
+  4. Pilih strategy = TTL sweep, klik [Invalidate]
+  5. Catat berapa item yang dihapus
+  Hasil: Item dihapus = ________
+
+  [Tag-based]
+  1. Klik [Reset], tambah 6 item lagi
+  2. Pilih strategy = Tag-based, klik tag [user]
+  3. Klik [Invalidate]
+  4. Catat: item dengan tag "user" terhapus semua?
+  Hasil: Item dihapus = ________ (tag: user)
+
+  [Write-through Refresh]
+  1. Klik [Reset], tambah 4 item
+  2. Klik [Tick +5s] 2 kali
+  3. Pilih strategy = Write-through refresh, klik [Invalidate]
+  4. Catat: item mana yang direfresh (ts di-reset)
+  Hasil: Item di-refresh = ________
+
+  Perbandingan Strategy:
+  Strategy           | Kelebihan              | Kekurangan
+  -------------------|------------------------|--------------------
+  TTL sweep          | ______________________ | __________________
+  Tag-based          | ______________________ | __________________
+  Key-based          | ______________________ | __________________
+  Write-through      | ______________________ | __________________
+
+----------------------------------------------------------------
+D. KESIMPULAN PENGUJIAN
+----------------------------------------------------------------
+
+1. Cache-Aside Pattern:
+   Terbukti mengurangi beban DB secara signifikan. Setelah data
+   masuk cache, latency turun dari ~50–150ms (DB) menjadi <5ms.
+
+2. Eviction Policy Terbaik:
+   - LRU cocok untuk workload dengan temporal locality tinggi
+   - LFU cocok untuk konten populer yang sering diakses
+   - TTL cocok untuk data yang punya masa berlaku alami
+
+3. Write Strategy Trade-off:
+   - Write-through  : konsistensi tinggi, latency lebih tinggi
+   - Write-back     : performa tinggi, risiko data loss
+   - Write-around   : cocok untuk data yang jarang dibaca ulang
+
+4. CDN:
+   Origin fetch (MISS) 10–20x lebih lambat dibanding edge hit.
+   Resource statis (gambar, CSS) sangat diuntungkan CDN.
+   Resource dinamis (API) butuh TTL pendek untuk freshness.
+
+5. Invalidation:
+   Tag-based paling fleksibel untuk invalidasi massal.
+   Key-based paling presisi untuk satu data spesifik.
+   TTL sweep cocok untuk pembersihan rutin otomatis.
+
+----------------------------------------------------------------
+E. REFERENSI
+----------------------------------------------------------------
+- Redis Documentation       : https://redis.io/docs
+- Memcached Documentation   : https://memcached.org
+- Cache-Aside Pattern       : https://docs.microsoft.com/azure/architecture/patterns/cache-aside
+- CDN Caching Concepts      : https://web.dev/http-cache/
+- SQLite Documentation      : https://www.sqlite.org/docs.html
+
+================================================================
+   Selesai — isi kolom hasil pengujian saat menjalankan simulasi
+================================================================
